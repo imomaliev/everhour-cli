@@ -1,0 +1,14 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+click = "*"
+python-everhour = {git = "https://github.com/imomaliev/python-everhour", editable = true}
+xdg = "==3.0.2"
+
+[dev-packages]
+
+[requires]
+python_version = "3.6"
