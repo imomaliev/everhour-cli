@@ -12,18 +12,19 @@ from shutil import rmtree
 from setuptools import find_packages, setup, Command
 
 # Package meta-data.
-NAME = 'everhour_cli'
+NAME = 'everhour-cli'
 DESCRIPTION = 'Quick and dirty everhour cli for hour reporting with everhour'
-URL = 'https://github.com/tonibirrer/everhour_cli'
-EMAIL = 'github@dexter.cc'
-AUTHOR = 'Toni Birrer'
-REQUIRES_PYTHON = '>=2.7.0<=3.0.0'
-VERSION = '1.0.1'
+URL = 'https://github.com/imomaliev/everhour-cli'
+EMAIL = 'sardorbek.imomaliev@gmail.com'
+AUTHOR = 'Sardorbek Imomaliev'
+REQUIRES_PYTHON = '>=3.5.0'
+VERSION = '0.2.0'
 
 # What packages are required for this module to be executed?
 REQUIRED = [
     'click',
     'xdg',
+    'tabulate',
 ]
 
 # The rest you shouldn't have to touch too much :)
@@ -95,9 +96,9 @@ setup(
     author_email=EMAIL,
     python_requires=REQUIRES_PYTHON,
     url=URL,
-    packages=find_packages(exclude=('tests',)),
+    # packages=find_packages(exclude=('tests',)),
     # If your package is a single module, use this instead of 'packages':
-    # py_modules=['mypackage'],
+    py_modules=['everhourcli'],
     entry_points={
         'console_scripts': [
             'everhour = everhourcli:main',
@@ -105,7 +106,7 @@ setup(
     },
     install_requires=REQUIRED,
     dependency_links=[
-        "git+https://github.com/imomaliev/python-everhour"
+        "git+https://github.com/imomaliev/python-everhour#egg=everhour"
     ],
     include_package_data=True,
     license='MIT',
@@ -114,8 +115,8 @@ setup(
         # Full list: https://pypi.python.org/pypi?%3Aaction=list_classifiers
         'License :: OSI Approved :: MIT License',
         'Programming Language :: Python',
-        'Programming Language :: Python :: 2',
-        'Programming Language :: Python :: 2.7',
+        'Programming Language :: Python :: 3',
+        'Programming Language :: Python :: 3.5',
     ],
     # $ setup.py publish support.
     cmdclass={
