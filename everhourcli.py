@@ -24,41 +24,67 @@ def get_xdg_json_data():
 
 
 configs = get_xdg_json_data()
-api = Everhour(configs['token'])
+api_map = {k: Everhour(v) for k,v in configs.items()}
 
 
 class Timer:
-    def __init__(self, start_dt):
-        self._delta = datetime.datetime.now() - start_dt
+    def __init__(self, account, api, name, start_dt):
+        self._account = account
+        self._api = api
+        self._name = name
+        self._start_dt = start_dt
+        self._delta = datetime.datetime.now() - self._start_dt
 
     def __repr__(self):
-        return str(self._delta).split('.')[0]
+        return '{0}: {1}'.format(self._name, str(self._delta).split('.')[0])
 
-    def echo(self, name):
-        click.echo('{0}: {1}'.format(name, self.__repr__()))
-        _default_text_stdout().write('\033[F')  # Cursor up one line
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc, value, traceback):
+        click.echo('Stopped', nl=True)
+        resp = self._api.timers.stop()
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        try:
+            self._delta = datetime.datetime.now() - self._start_dt
+            time.sleep(2)
+        except KeyboardInterrupt:
+            raise StopIteration
+
+    def echo(self, ):
+        click.echo(self)
+        # https://stackoverflow.com/a/5291044/3627387
+        _default_text_stdout().write('\033[F\033[K')  # Cursor up one line
 
 
 @click.command()
 def _list():
-    tasks = api.users.time()
-    me_id = str(api.users.me()['id'])
+    table = set()
+    for account, api in api_map.items():
+        tasks = api.users.time()
+        me_id = str(api.users.me()['id'])
 
-    def _get_table(tasks):
-        table = set()
         for task in tasks:
             task = task['task']
-            seconds = task['time']['users'][me_id]
+            if task['status'] == 'completed':
+                continue
+            try:
+                seconds = task['time']['users'][me_id]
+            except KeyError:
+                continue
             task_time = time.strftime("%H:%M:%S", time.gmtime(seconds))
             name = task['name']
 
-            row = (task['id'], '\n'.join(textwrap.wrap(name, 50)), task_time)
+            row = (account, task['id'], '\n'.join(textwrap.wrap(name, 50)), task_time)
             table.add(row)
-        return table
 
     click.echo(tabulate.tabulate(
-        _get_table(tasks),
-        ['id', 'name', 'time'],
+        table,
+        ['account', 'id', 'name', 'time'],
         # floatfmt='.2f',
         tablefmt='grid'
     ))
@@ -68,17 +94,16 @@ def _list():
 @click.argument('task_id')
 def _start(task_id):
     start_dt = datetime.datetime.now()
-    resp = api.timers.start(task_id)
-    name = resp['task']['name']
-    Timer(start_dt).echo(name)
-    while True:
+    for account, api in api_map.items():
+        resp = api.timers.start(task_id)
         try:
-            time.sleep(2)
-            Timer(start_dt).echo(name)
-        except KeyboardInterrupt:
-            click.echo('Stopped', nl=True)
-            resp = api.timers.stop()
+            name = resp['task']['name']
             break
+        except KeyError:
+            continue
+    with Timer(account, api, name, start_dt) as timer:
+        for __ in timer:
+            timer.echo()
 
 
 @click.group()
