@@ -1,7 +1,9 @@
-import time
 import datetime
 import json
 import textwrap
+import operator
+
+from collections import namedtuple
 
 from pathlib import Path
 
@@ -61,27 +63,63 @@ class Timer:
         _default_text_stdout().write('\033[F\033[K')  # Cursor up one line
 
 
+TimeRecord = namedtuple('TimeRecord', ('name', 'id', 'time'))
+
+
+def _strfttime(seconds):
+    hours, seconds = divmod(seconds, 3600)
+    minutes = seconds // 60
+    if not hours:
+        return '{}m'.format(minutes)
+    return '{}h {}m'.format(hours, minutes)
+
+
 @click.command()
-def _list():
+@click.argument('range_', default='today')
+def _list(range_):
+    if range_ == 'today':
+        today = datetime.date.today()
+        range_ = [today, today]
+    elif range_ == 'week':
+        today = datetime.date.today()
+        start = today - datetime.timedelta(days=today.weekday())
+        end = start + datetime.timedelta(days=6)
+        range_ = [start, end]
+    elif range_ == 'month':
+        today = datetime.date.today()
+        range_ = [today.replace(day=1), today.replace(day=1, month=today.month + 1) - datetime.timedelta(days=1)]
+
     table = set()
+    total = 0
     for account, api in api_map.items():
-        tasks = api.users.time()
+        records = api.users.time()
         me_id = str(api.users.me()['id'])
 
-        for task in tasks:
-            task = task['task']
-            if task['status'] == 'completed':
-                continue
-            try:
-                seconds = task['time']['users'][me_id]
-            except KeyError:
-                continue
-            task_time = time.strftime("%H:%M:%S", time.gmtime(seconds))
-            name = task['name']
+        record_map = {}
+        record_names = {}
+        for record in records:
+            # 2018-06-18 04:44:33
+            record_date = datetime.datetime.strptime(record['date'], '%Y-%m-%d').date()
+            if range_[1] >= record_date >= range_[0]:
+                total += record['time']
+                record_id = record['task']['id']
 
-            row = (account, task['id'], '\n'.join(textwrap.wrap(name, 50)), task_time)
+                if record_id not in record_map:
+                    record_map[record_id] = TimeRecord(
+                        name=record['task']['name'],
+                        id=record['task']['id'],
+                        time=record['time']
+                    )
+                else:
+                    record_map[record_id] = record_map[record_id]._replace(time=record_map[record_id].time + record['time'])
+        for k, task in record_map.items():
+            task_time = _strfttime(task.time)
+            row = (account, task.id, '\n'.join(textwrap.wrap(task.name, 50)), task_time)
             table.add(row)
 
+    table = sorted(table, key=lambda i: i[0])
+    total_time = _strfttime(total)
+    table.append(('total', '', 'Total', total_time))
     click.echo(tabulate.tabulate(
         table,
         ['account', 'id', 'name', 'time'],
