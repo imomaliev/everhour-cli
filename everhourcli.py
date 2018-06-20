@@ -1,3 +1,4 @@
+import os
 import time
 import datetime
 import json
@@ -60,8 +61,12 @@ class Timer:
 
     def echo(self, ):
         click.echo(self)
+        # we need to account for long lines
+        # TODO: have issues on resize
+        width = os.get_terminal_size().columns
+        lines = len(self.__repr__()) // width + 1
         # https://stackoverflow.com/a/5291044/3627387
-        _default_text_stdout().write('\033[F\033[K')  # Cursor up one line
+        _default_text_stdout().write('\033[F\033[K' * lines)  # Cursor up one line
 
 
 TimeRecord = namedtuple('TimeRecord', ('name', 'id', 'time'))
