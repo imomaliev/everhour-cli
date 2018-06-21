@@ -1,34 +1,11 @@
-import os
-import time
 import datetime
-import json
 import textwrap
-import operator
 
 from collections import namedtuple
 
-from pathlib import Path
-
-import click
-from click.utils import _default_text_stdout
-
-from xdg import XDG_CONFIG_HOME
-
 import tabulate
 
-from everhour import Everhour
-
-
-def get_xdg_json_data():
-    path = Path(XDG_CONFIG_HOME, 'everhour', 'settings.json')
-    if path.exists():
-        with path.open('r') as a:
-            return json.load(a)
-    return {}
-
-
-configs = get_xdg_json_data()
-api_map = {k: Everhour(v) for k,v in configs.items()}
+from prompt_toolkit.shortcuts import print_formatted_text
 
 
 class Timer:
@@ -37,36 +14,14 @@ class Timer:
         self._api = api
         self._name = name
         self._start_dt = start_dt
-        self._delta = datetime.datetime.now() - self._start_dt
 
     def __repr__(self):
-        return '{0}: {1}'.format(self._name, str(self._delta).split('.')[0])
+        _delta = datetime.datetime.now() - self._start_dt
+        return '{0}: {1}'.format(self._name, str(_delta).split('.')[0])
 
-    def __enter__(self):
-        return self
+    def stop(self):
+        self._api.timers.stop()
 
-    def __exit__(self, exc, value, traceback):
-        click.echo('Stopped', nl=True)
-        resp = self._api.timers.stop()
-
-    def __iter__(self):
-        return self
-
-    def __next__(self):
-        try:
-            self._delta = datetime.datetime.now() - self._start_dt
-            time.sleep(2)
-        except KeyboardInterrupt:
-            raise StopIteration
-
-    def echo(self, ):
-        click.echo(self)
-        # we need to account for long lines
-        # TODO: have issues on resize
-        width = os.get_terminal_size().columns
-        lines = len(self.__repr__()) // width + 1
-        # https://stackoverflow.com/a/5291044/3627387
-        _default_text_stdout().write('\033[F\033[K' * lines)  # Cursor up one line
 
 
 TimeRecord = namedtuple('TimeRecord', ('name', 'id', 'time'))
@@ -80,9 +35,8 @@ def _strfttime(seconds):
     return '{}h {}m'.format(hours, minutes)
 
 
-@click.command()
-@click.argument('range_', default='today')
-def _list(range_):
+
+def list_tasks(api_map, range_):
     if range_ == 'today':
         today = datetime.date.today()
         range_ = [today, today]
@@ -126,7 +80,7 @@ def _list(range_):
     table = sorted(table, key=lambda i: i[0])
     total_time = _strfttime(total)
     table.append(('total', '', 'Total', total_time))
-    click.echo(tabulate.tabulate(
+    print_formatted_text(tabulate.tabulate(
         table,
         ['account', 'id', 'name', 'time'],
         # floatfmt='.2f',
@@ -134,9 +88,17 @@ def _list(range_):
     ))
 
 
-@click.command()
-@click.argument('task_id')
-def _start(task_id):
+def stop_timer(timer):
+    if timer:
+        timer.stop()
+        print_formatted_text('Stopped')
+        timer = None
+    else:
+        print_formatted_text('No active timer')
+    return timer
+
+
+def start_timer(api_map, timer, task_id):
     start_dt = datetime.datetime.now()
     for account, api in api_map.items():
         resp = api.timers.start(task_id)
@@ -145,18 +107,4 @@ def _start(task_id):
             break
         except KeyError:
             continue
-    with Timer(account, api, name, start_dt) as timer:
-        for __ in timer:
-            timer.echo()
-
-
-@click.group()
-def main():
-    pass
-
-
-main.add_command(_list, name='list')
-main.add_command(_start, name='start')
-
-if __name__ == '__main__':
-    main()
+    return Timer(account, api, name, start_dt)

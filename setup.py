@@ -18,11 +18,10 @@ URL = 'https://github.com/imomaliev/everhour-cli'
 EMAIL = 'sardorbek.imomaliev@gmail.com'
 AUTHOR = 'Sardorbek Imomaliev'
 REQUIRES_PYTHON = '>=3.5.0'
-VERSION = '0.2.0'
+VERSION = '0.3.0'
 
 # What packages are required for this module to be executed?
 REQUIRED = [
-    'click',
     'xdg',
     'tabulate',
 ]
@@ -96,9 +95,9 @@ setup(
     author_email=EMAIL,
     python_requires=REQUIRES_PYTHON,
     url=URL,
-    # packages=find_packages(exclude=('tests',)),
+    packages=find_packages(exclude=('tests',)),
     # If your package is a single module, use this instead of 'packages':
-    py_modules=['everhourcli'],
+    # py_modules=['everhourcli'],
     entry_points={
         'console_scripts': [
             'everhour = everhourcli:main',
