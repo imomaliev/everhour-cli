@@ -1,5 +1,3 @@
-
-
 from prompt_toolkit import PromptSession
 from prompt_toolkit.shortcuts import print_formatted_text
 from prompt_toolkit.history import FileHistory

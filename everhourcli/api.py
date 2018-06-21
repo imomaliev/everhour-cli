@@ -17,10 +17,6 @@ def get_xdg_json_data():
     return {}
 
 
-
-configs = get_xdg_json_data()
-
-
 TimeRecord = namedtuple('TimeRecord', ('account', 'name', 'id', 'time'))
 
 
@@ -41,8 +37,12 @@ class Timer:
 
 class Api:
     def __init__(self):
+        configs = get_xdg_json_data()
         self._map = {k: Everhour(v) for k,v in configs.items()}
         self.timer = None
+        self._tasks = {}
+        today = datetime.date.today()
+        self.tasks(today, today)
 
     def tasks(self, start, end):
         total = 0
@@ -55,22 +55,25 @@ class Api:
                 record_date = datetime.datetime.strptime(record['date'], '%Y-%m-%d').date()
                 if end >= record_date >= start:
                     total += record['time']
-                    record_id = record['task']['id']
+                    task_id = record['task']['id']
 
-                    if record_id not in record_map:
-                        record_map[record_id] = TimeRecord(
+                    if task_id not in record_map:
+                        record_map[task_id] = TimeRecord(
                             account=account,
                             name=record['task']['name'],
                             id=record['task']['id'],
                             time=record['time']
                         )
                     else:
-                        record_map[record_id] = record_map[record_id]._replace(time=record_map[record_id].time + record['time'])
+                        record_map[task_id] = record_map[task_id]._replace(time=record_map[task_id].time + record['time'])
+                    self._tasks[task_id] = record_map[task_id]
 
         return record_map, total
 
     def start(self, task_id):
         start_dt = datetime.datetime.now()
+        if task_id in self._tasks:
+            start_dt -= datetime.timedelta(seconds=self._tasks[task_id].time)
         for account, api in self._map.items():
             resp = api.timers.start(task_id)
             try:

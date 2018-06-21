@@ -1,11 +1,9 @@
 import datetime
 import textwrap
 
-
 import tabulate
 
 from prompt_toolkit.shortcuts import print_formatted_text
-
 
 
 def _strfttime(seconds):
@@ -14,7 +12,6 @@ def _strfttime(seconds):
     if not hours:
         return '{}m'.format(minutes)
     return '{}h {}m'.format(hours, minutes)
-
 
 
 def list_tasks(api_map, range_):
