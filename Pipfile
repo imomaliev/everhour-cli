@@ -4,10 +4,10 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
-click = "*"
 python-everhour = {git = "https://github.com/imomaliev/python-everhour", editable = true}
 xdg = "==3.0.2"
 tabulate = "*"
+prompt-toolkit = "*"
 
 [dev-packages]
 

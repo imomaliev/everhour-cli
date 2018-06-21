@@ -1,3 +1,4 @@
+import time
 import datetime
 import json
 import textwrap
@@ -7,8 +8,10 @@ from collections import namedtuple
 
 from pathlib import Path
 
-import click
-from click.utils import _default_text_stdout
+from prompt_toolkit import PromptSession
+from prompt_toolkit.completion import WordCompleter
+from prompt_toolkit.shortcuts import prompt, CompleteStyle, print_formatted_text
+from prompt_toolkit.formatted_text import ANSI
 
 from xdg import XDG_CONFIG_HOME
 
@@ -16,6 +19,8 @@ import tabulate
 
 from everhour import Everhour
 
+
+timer = None
 
 def get_xdg_json_data():
     path = Path(XDG_CONFIG_HOME, 'everhour', 'settings.json')
@@ -38,29 +43,11 @@ class Timer:
         self._delta = datetime.datetime.now() - self._start_dt
 
     def __repr__(self):
+        self._delta = datetime.datetime.now() - self._start_dt
         return '{0}: {1}'.format(self._name, str(self._delta).split('.')[0])
 
-    def __enter__(self):
-        return self
-
-    def __exit__(self, exc, value, traceback):
-        click.echo('Stopped', nl=True)
-        resp = self._api.timers.stop()
-
-    def __iter__(self):
-        return self
-
-    def __next__(self):
-        try:
-            self._delta = datetime.datetime.now() - self._start_dt
-            time.sleep(2)
-        except KeyboardInterrupt:
-            raise StopIteration
-
-    def echo(self, ):
-        click.echo(self)
-        # https://stackoverflow.com/a/5291044/3627387
-        _default_text_stdout().write('\033[F\033[K')  # Cursor up one line
+    def stop(self):
+        timer._api.timers.stop()
 
 
 TimeRecord = namedtuple('TimeRecord', ('name', 'id', 'time'))
@@ -74,8 +61,6 @@ def _strfttime(seconds):
     return '{}h {}m'.format(hours, minutes)
 
 
-@click.command()
-@click.argument('range_', default='today')
 def _list(range_):
     if range_ == 'today':
         today = datetime.date.today()
@@ -120,7 +105,7 @@ def _list(range_):
     table = sorted(table, key=lambda i: i[0])
     total_time = _strfttime(total)
     table.append(('total', '', 'Total', total_time))
-    click.echo(tabulate.tabulate(
+    print_formatted_text(tabulate.tabulate(
         table,
         ['account', 'id', 'name', 'time'],
         # floatfmt='.2f',
@@ -128,9 +113,15 @@ def _list(range_):
     ))
 
 
-@click.command()
-@click.argument('task_id')
+def _stop():
+    global timer
+    timer.stop()
+    print_formatted_text('Stopped')
+    timer = None
+
+
 def _start(task_id):
+    global timer
     start_dt = datetime.datetime.now()
     for account, api in api_map.items():
         resp = api.timers.start(task_id)
@@ -139,18 +130,52 @@ def _start(task_id):
             break
         except KeyError:
             continue
-    with Timer(account, api, name, start_dt) as timer:
-        for __ in timer:
-            timer.echo()
+    timer = Timer(account, api, name, start_dt)
 
 
-@click.group()
 def main():
-    pass
+    animal_completer = WordCompleter([
+        'list', 'start', 'stop'
+    ], meta_dict={
+        'list': 'List tasks default today, possible choices: today, week, month',
+        'start': 'Start timer for task_id',
+        'stop': 'Stop current timer',
+    }, ignore_case=True)
+    session = PromptSession('> ', completer=animal_completer)
+    global timer
+    while True:
+        def get_prompt():
+            " Tokens to be shown before the prompt. "
+            now = datetime.datetime.now()
+            if timer:
+                return [
+                    ('bg:#008800 #ffffff', '%s' % (timer)),
+                    ('', ' > ')
+                ]
+            return [
+                ('', '> ')
+            ]
+        try:
+            text = session.prompt(get_prompt, refresh_interval=2)
+            text = text.strip()
+            if text.startswith('start'):
+                task_id = text.split(' ')[1]
+                _start(task_id)
+            elif text.startswith('stop'):
+                _stop()
+            elif text.startswith('list'):
+                range_ = text.split(' ')
+                if len(range_) > 1:
+                    range_ = range_[1]
+                else:
+                    range_ = 'today'
+                _list(range_)
 
+        except KeyboardInterrupt:
+            continue  # Control-C pressed. Try again.
+        except EOFError:
+            break  # Control-D pressed.
 
-main.add_command(_list, name='list')
-main.add_command(_start, name='start')
 
 if __name__ == '__main__':
     main()
