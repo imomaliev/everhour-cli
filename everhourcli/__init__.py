@@ -9,9 +9,8 @@ from collections import namedtuple
 from pathlib import Path
 
 from prompt_toolkit import PromptSession
-from prompt_toolkit.completion import WordCompleter
-from prompt_toolkit.shortcuts import prompt, CompleteStyle, print_formatted_text
-from prompt_toolkit.formatted_text import ANSI
+from prompt_toolkit.shortcuts import print_formatted_text
+from prompt_toolkit.history import FileHistory
 
 from xdg import XDG_CONFIG_HOME
 
@@ -19,8 +18,12 @@ import tabulate
 
 from everhour import Everhour
 
+from .completer import everhour_completer
+from .history import get_history
+
 
 timer = None
+
 
 def get_xdg_json_data():
     path = Path(XDG_CONFIG_HOME, 'everhour', 'settings.json')
@@ -40,11 +43,10 @@ class Timer:
         self._api = api
         self._name = name
         self._start_dt = start_dt
-        self._delta = datetime.datetime.now() - self._start_dt
 
     def __repr__(self):
-        self._delta = datetime.datetime.now() - self._start_dt
-        return '{0}: {1}'.format(self._name, str(self._delta).split('.')[0])
+        _delta = datetime.datetime.now() - self._start_dt
+        return '{0}: {1}'.format(self._name, str(_delta).split('.')[0])
 
     def stop(self):
         timer._api.timers.stop()
@@ -115,9 +117,12 @@ def _list(range_):
 
 def _stop():
     global timer
-    timer.stop()
-    print_formatted_text('Stopped')
-    timer = None
+    if timer:
+        timer.stop()
+        print_formatted_text('Stopped')
+        timer = None
+    else:
+        print_formatted_text('No active timer')
 
 
 def _start(task_id):
@@ -134,14 +139,9 @@ def _start(task_id):
 
 
 def main():
-    animal_completer = WordCompleter([
-        'list', 'start', 'stop'
-    ], meta_dict={
-        'list': 'List tasks default today, possible choices: today, week, month',
-        'start': 'Start timer for task_id',
-        'stop': 'Stop current timer',
-    }, ignore_case=True)
-    session = PromptSession('> ', completer=animal_completer)
+    history = FileHistory(get_history())
+    session = PromptSession('> ', completer=everhour_completer, history=history)
+
     global timer
     while True:
         def get_prompt():
@@ -156,7 +156,7 @@ def main():
                 ('', '> ')
             ]
         try:
-            text = session.prompt(get_prompt, refresh_interval=2)
+            text = session.prompt(get_prompt, refresh_interval=1)
             text = text.strip()
             if text.startswith('start'):
                 task_id = text.split(' ')[1]
@@ -174,6 +174,8 @@ def main():
         except KeyboardInterrupt:
             continue  # Control-C pressed. Try again.
         except EOFError:
+            if timer:
+                timer.stop()
             break  # Control-D pressed.
 
 

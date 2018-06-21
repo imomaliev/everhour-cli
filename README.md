@@ -18,9 +18,11 @@ Place settings file in `XDG_CONFIG_HOME/everhour/settings.json`
 and then
 
 ```sh
+everhour
 # list your tasks
-everhour list
+> list
 # start time on task
-everhour start task_id
-# ^-c - to stop
+> start task_id
+# stop
+> stop
 ```
